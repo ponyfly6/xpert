@@ -327,6 +327,11 @@ export const AI_PROVIDERS: Record<AiProvider, Partial<AiProviderType>> = {
     isTools: true,
     models: [
       {
+        id: 'GLM-4.7',
+        name: 'GLM-4.7',
+        capabilities: [AiModelCapability.Chat]
+      },
+      {
         id: 'GLM-4-Plus',
         name: 'GLM-4-Plus',
         capabilities: [AiModelCapability.Chat]
