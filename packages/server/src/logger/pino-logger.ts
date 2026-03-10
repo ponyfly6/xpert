@@ -132,11 +132,18 @@ export function buildPinoLoggerParams(userConfig?: Partial<Params>): Params {
     },
   };
 
-  if (userConfig) {
-    return { ...defaultParams, ...userConfig };
+  if (!userConfig) {
+    return defaultParams;
   }
 
-  return defaultParams;
+  // Merge pinoHttp configuration deeply, other properties shallowly
+  const mergedParams = { ...defaultParams, ...userConfig };
+  
+  if (userConfig.pinoHttp) {
+    mergedParams.pinoHttp = { ...defaultParams.pinoHttp, ...userConfig.pinoHttp };
+  }
+  
+  return mergedParams;
 }
 
 export function providePinoLoggerModule(userConfig?: Partial<Params>) {
