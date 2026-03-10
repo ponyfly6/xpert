@@ -4,51 +4,53 @@ import { TypeOrmModuleOptions } from '@nestjs/typeorm';
 import { ILogger } from './ILogger';
 
 export interface IGraphqlOptions {
-	path: string;
+        path: string;
 
-	playground: boolean;
+        playground: boolean;
 
-	debug: boolean;
+        debug: boolean;
 
-	// apolloServerPlugins?: PluginDefinition[];
+        // apolloServerPlugins?: PluginDefinition[];
 }
 
 export interface IAssetOptions {
-	assetPath: string;
-	assetPublicPath: string;
-	serverRoot: string
-	dataPath: string
+        assetPath: string;
+        assetPublicPath: string;
+        serverRoot: string
+        dataPath: string
 }
 export interface IApiServerOptions {
-	host?: string;
+        host?: string;
 
-	port: number | string;
+        port: number | string;
 
-	baseUrl?: string;
+        baseUrl?: string;
 
-	middleware?: any;
+        middleware?: any;
 
-	graphqlConfigOptions: IGraphqlOptions;
+        graphqlConfigOptions: IGraphqlOptions;
 }
 
 export interface IAuthOptions {
-	expressSessionSecret: string;
+        expressSessionSecret: string;
 
-	userPasswordBcryptSaltRounds: number;
+        userPasswordBcryptSaltRounds: number;
 
-	jwtSecret: string;
+        jwtSecret: string;
 }
 
 export interface IPluginConfig {
-	apiConfigOptions: IApiServerOptions;
+        apiConfigOptions: IApiServerOptions;
 
-	dbConnectionOptions: TypeOrmModuleOptions;
+        dbConnectionOptions: TypeOrmModuleOptions;
 
-	plugins?: Array<DynamicModule | Type<any>>;
+        plugins?: Array<DynamicModule | Type<any>>;
 
-	logger?: ILogger;
+        logger?: ILogger;
 
-	authOptions?: IAuthOptions;
+        authOptions?: IAuthOptions;
 
-	assetOptions?: IAssetOptions;
+        assetOptions?: IAssetOptions;
+
+        loggerConfig?: any;
 }

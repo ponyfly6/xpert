@@ -3,6 +3,7 @@ import { IncomingMessage, ServerResponse } from 'http';
 import { LoggerModule as PinoLoggerModule } from 'nestjs-pino';
 import { Params } from 'nestjs-pino';
 import * as path from 'path';
+import { getConfig } from '@metad/server-config';
 
 const SERVICE_NAME = 'xpert-server';
 
@@ -91,11 +92,11 @@ const buildFileTarget = (logLevel: string) => ({
   },
 });
 
-export function buildPinoLoggerParams(): Params {
+export function buildPinoLoggerParams(userConfig?: Partial<Params>): Params {
   const env = resolveEnv();
   const logLevel = resolveLogLevel();
 
-  return {
+  const defaultParams: Params = {
     pinoHttp: {
       level: logLevel,
       transport: {
@@ -130,8 +131,16 @@ export function buildPinoLoggerParams(): Params {
       },
     },
   };
+
+  if (userConfig) {
+    return { ...defaultParams, ...userConfig };
+  }
+
+  return defaultParams;
 }
 
-export function providePinoLoggerModule() {
-  return PinoLoggerModule.forRoot(buildPinoLoggerParams());
+export function providePinoLoggerModule(userConfig?: Partial<Params>) {
+  const config = getConfig();
+  const loggerConfig = userConfig || (config.loggerConfig as Partial<Params>);
+  return PinoLoggerModule.forRoot(buildPinoLoggerParams(loggerConfig));
 }
