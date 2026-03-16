@@ -19,13 +19,13 @@ export class ScreenshotSubscriber implements EntitySubscriberInterface<Screensho
      * @param entity
      * @param event
      */
-    afterLoad(entity: Screenshot | Partial<Screenshot>, event?: LoadEvent<Screenshot>): void | Promise<any> {
+    async afterLoad(entity: Screenshot | Partial<Screenshot>, event?: LoadEvent<Screenshot>): Promise<void> {
         try {
             if (entity instanceof Screenshot) {
                 const { storageProvider } = entity;
                 const store = new FileStorage().setProvider(storageProvider);
-                entity.fileUrl = store.getProviderInstance().url(entity.file);
-                entity.thumbUrl = store.getProviderInstance().url(entity.thumb);
+                entity.fileUrl = await store.getProviderInstance().url(entity.file);
+                entity.thumbUrl = await store.getProviderInstance().url(entity.thumb);
             }
         } catch (error) {
             console.log(error);

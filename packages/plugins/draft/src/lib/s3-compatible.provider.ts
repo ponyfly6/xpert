@@ -2,7 +2,8 @@ import { FileStorageOption, UploadedFile } from '@metad/contracts'
 import { IFileStorageProvider, IPluginConfigResolver, PLUGIN_CONFIG_RESOLVER_TOKEN } from '@xpert-ai/plugin-sdk'
 import { Inject, Injectable, Optional } from '@nestjs/common'
 import { ConfigType } from '@nestjs/config'
-import AWS from 'aws-sdk'
+import { S3Client, GetObjectCommand, PutObjectCommand, DeleteObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3'
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import multerS3 from 'multer-s3'
 import { StorageEngine } from 'multer'
 import { basename } from 'path'
@@ -40,17 +41,18 @@ export abstract class S3CompatibleProvider implements IFileStorageProvider {
     return this.mergeConfig()
   }
 
-  url(filePath: string): string {
+  async url(filePath: string): Promise<string> {
     const config = this.getValidatedConfig()
     if (config.publicUrl) {
       return this.buildProviderPublicUrl(config, filePath)
     }
 
-    return this.getS3Instance(config).getSignedUrl('getObject', {
+    const s3 = this.getS3Instance(config)
+    const command = new GetObjectCommand({
       Bucket: config.bucket,
-      Key: filePath,
-      Expires: config.signedUrlExpires
+      Key: filePath
     })
+    return getSignedUrl(s3, command, { expiresIn: config.signedUrlExpires })
   }
 
   path(filePath: string): string {
@@ -75,14 +77,15 @@ export abstract class S3CompatibleProvider implements IFileStorageProvider {
 
   async getFile(key: string): Promise<Buffer> {
     const config = this.getValidatedConfig()
-    const data = await this.getS3Instance(config)
-      .getObject({
-        Bucket: config.bucket,
-        Key: key
-      })
-      .promise()
+    const s3 = this.getS3Instance(config)
+    const command = new GetObjectCommand({
+      Bucket: config.bucket,
+      Key: key
+    })
 
-    return data.Body as Buffer
+    const data = await s3.send(command)
+    const body = await data.Body.transformToByteArray()
+    return Buffer.from(body)
   }
 
   async putFile(fileContent: string | Buffer | URL, key = ''): Promise<UploadedFile> {
@@ -90,22 +93,20 @@ export abstract class S3CompatibleProvider implements IFileStorageProvider {
     const fileName = basename(key)
     const s3 = this.getS3Instance(config)
 
-    await s3
-      .putObject({
-        Bucket: config.bucket,
-        Body: fileContent as string | Buffer,
-        Key: key,
-        ContentDisposition: `inline; filename="${fileName}"`
-      })
-      .promise()
+    const putCommand = new PutObjectCommand({
+      Bucket: config.bucket,
+      Body: fileContent as string | Buffer,
+      Key: key,
+      ContentDisposition: `inline; filename="${fileName}"`
+    })
+    await s3.send(putCommand)
 
-    const size = await s3
-      .headObject({
-        Bucket: config.bucket,
-        Key: key
-      })
-      .promise()
-      .then((res) => res.ContentLength || 0)
+    const headCommand = new HeadObjectCommand({
+      Bucket: config.bucket,
+      Key: key
+    })
+    const res = await s3.send(headCommand)
+    const size = res.ContentLength || 0
 
     return this.mapUploadedFile({
       originalname: fileName,
@@ -118,17 +119,17 @@ export abstract class S3CompatibleProvider implements IFileStorageProvider {
 
   async deleteFile(key: string): Promise<void> {
     const config = this.getValidatedConfig()
-    await this.getS3Instance(config)
-      .deleteObject({
-        Bucket: config.bucket,
-        Key: key
-      })
-      .promise()
+    const s3 = this.getS3Instance(config)
+    const command = new DeleteObjectCommand({
+      Bucket: config.bucket,
+      Key: key
+    })
+    await s3.send(command)
   }
 
-  mapUploadedFile(file: any): UploadedFile {
+  async mapUploadedFile(file: any): Promise<UploadedFile> {
     file.filename = file.originalname
-    file.url = file.url || this.url(file.key)
+    file.url = file.url || (await this.url(file.key))
     return file
   }
 
@@ -149,14 +150,15 @@ export abstract class S3CompatibleProvider implements IFileStorageProvider {
     }
   }
 
-  protected getS3Instance(config: TS3CompatibleRuntimeConfig) {
-    return new AWS.S3({
-      accessKeyId: config.accessKeyId,
-      secretAccessKey: config.secretAccessKey,
+  protected getS3Instance(config: TS3CompatibleRuntimeConfig): S3Client {
+    return new S3Client({
+      credentials: {
+        accessKeyId: config.accessKeyId,
+        secretAccessKey: config.secretAccessKey
+      },
       region: config.region,
       endpoint: config.endpoint || undefined,
-      s3ForcePathStyle: config.forcePathStyle !== false,
-      signatureVersion: 'v4'
+      forcePathStyle: config.forcePathStyle !== false
     })
   }
 

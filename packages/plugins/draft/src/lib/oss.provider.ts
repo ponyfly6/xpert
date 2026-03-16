@@ -83,9 +83,9 @@ export class OSSProvider implements IFileStorageProvider {
     await this.getOssInstance(config).delete(key)
   }
 
-  mapUploadedFile(file: any): UploadedFile {
+  async mapUploadedFile(file: any): Promise<UploadedFile> {
     file.filename = file.originalname
-    file.url = file.url || this.url(file.key)
+    file.url = file.url || await this.url(file.key)
     return file
   }
 

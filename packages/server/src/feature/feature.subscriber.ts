@@ -8,30 +8,30 @@ import { Feature } from './feature.entity'
 
 @EventSubscriber()
 export class FeatureSubscriber implements EntitySubscriberInterface<Feature> {
-	/**
-	 * Indicates that this subscriber only listen to Feature events.
-	 */
-	listenTo() {
-		return Feature
-	}
+        /**
+         * Indicates that this subscriber only listen to Feature events.
+         */
+        listenTo() {
+                return Feature
+        }
 
-	/**
-	 * Called after entity is loaded.
-	 */
-	afterLoad(entity: any) {
-		if (!entity.status) {
-			entity.status = shuffle(Object.values(FeatureStatusEnum))[0]
-		}
+        /**
+         * Called after entity is loaded.
+         */
+        async afterLoad(entity: any) {
+                if (!entity.status) {
+                        entity.status = shuffle(Object.values(FeatureStatusEnum))[0]
+                }
 
-		if (!isNil(toggleFeatures[entity.code])) {
-			const feature = toggleFeatures[entity.code]
-			entity.isEnabled = feature
-		} else {
-			entity.isEnabled = true
-		}
+                if (!isNil(toggleFeatures[entity.code])) {
+                        const feature = toggleFeatures[entity.code]
+                        entity.isEnabled = feature
+                } else {
+                        entity.isEnabled = true
+                }
 
-		if (entity.image) {
-			entity.imageUrl = new FileStorage().getProvider().url(entity.image)
-		}
-	}
+                if (entity.image) {
+                        entity.imageUrl = await new FileStorage().getProvider().url(entity.image)
+                }
+        }
 }
