@@ -79,7 +79,7 @@ export function createCodeNode(
 							tryCount++
 							try {
 								results = await commandBus.execute(
-									new SandboxVMCommand(entity.code, inputs, null, entity.language)
+									new SandboxVMCommand(entity.code, inputs, null, entity.language, entity.timeout)
 								)
 							} catch (err) {
 								if (tryCount > maxRetry) {

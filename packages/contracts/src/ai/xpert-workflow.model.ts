@@ -331,6 +331,11 @@ export interface IWFNCode extends IWorkflowNode {
   inputs: {name: string; variable?: string}[]
   outputs: TXpertParameter[]
   /**
+   * Execution timeout in milliseconds (default: 5000ms)
+   * Only applies to JavaScript execution in isolated-vm
+   */
+  timeout?: number
+  /**
    * Retry on failure
    */
   retry?: TWorkflowRetry

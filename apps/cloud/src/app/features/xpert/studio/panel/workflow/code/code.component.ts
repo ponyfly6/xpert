@@ -64,6 +64,7 @@ export class XpertStudioPanelWorkflowCodeComponent extends XpertWorkflowBaseComp
   readonly enabledRetry = computed(() => this.retry()?.enabled)
   readonly stopAfterAttempt = computed(() => this.retry()?.stopAfterAttempt)
   readonly retryInterval = computed(() => this.retry()?.retryInterval)
+  readonly timeout = computed(() => this.entity()?.timeout)
   readonly errorHandling = computed(() => this.entity()?.errorHandling)
   readonly errorHType = computed(() => this.errorHandling()?.type)
 
@@ -197,5 +198,9 @@ export class XpertStudioPanelWorkflowCodeComponent extends XpertWorkflowBaseComp
   updateRetry(value: Partial<IWFNCode['retry']>) {
     const retry = this.retry() ?? {}
     this.updateEntity('retry', { ...retry, ...value })
+  }
+
+  updateTimeout(value: number) {
+    this.updateEntity('timeout', value)
   }
 }

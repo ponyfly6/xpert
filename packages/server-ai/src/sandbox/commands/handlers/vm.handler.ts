@@ -17,9 +17,9 @@ export class SandboxVMHandler implements ICommandHandler<SandboxVMCommand> {
 	) {}
 
 	public async execute(command: SandboxVMCommand) {
-		const { code, parameters, language } = command
+		const { code, parameters, language, timeout } = command
 		if (language === 'javascript') {
-			return await this.runJavaScriptCode(parameters, code)
+			return await this.runJavaScriptCode(parameters, code, timeout)
 		} else if (language === 'python') {
 			return await runPythonFunction(parameters, code)
 		}
@@ -27,7 +27,9 @@ export class SandboxVMHandler implements ICommandHandler<SandboxVMCommand> {
 		throw new Error(`Unsupported language ${language}`)
 	}
 
-	async runJavaScriptCode(parameters: any, code: string): Promise<any> {
+	async runJavaScriptCode(parameters: any, code: string, timeout?: number): Promise<any> {
+		// Validate and clamp timeout value (min: 100ms, max: 60000ms, default: 5000ms)
+		const timeoutMs = Math.max(100, Math.min(60000, timeout ?? 5000))
 		const isolate = new Isolate({ memoryLimit: 128 }) // 128MB 内存限制
 		const contextified = await isolate.createContext()
 		const jail = contextified.global
@@ -42,7 +44,7 @@ export class SandboxVMHandler implements ICommandHandler<SandboxVMCommand> {
 		const wrappedCode = `JSON.stringify((() => { \n${code}\n })())`
 
 		const script = await isolate.compileScript(wrappedCode)
-		const result = await script.run(contextified)
+		const result = await script.run(contextified, { timeout: timeoutMs })
 
 		return {
 			result: JSON.parse(result),

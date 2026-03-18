@@ -40,7 +40,7 @@ export class WorkflowTestNodeHandler implements ICommandHandler<WorkflowTestNode
 				case WorkflowNodeTypeEnum.CODE: {
 					const _entity = entity as IWFNCode
 					const results = await this.commandBus.execute(
-						new SandboxVMCommand(_entity.code, command.state, null, _entity.language)
+						new SandboxVMCommand(_entity.code, command.state, null, _entity.language, _entity.timeout)
 					)
 					return {
 						...(typeof results?.result === 'object' ? results.result : { result: results?.result }),

@@ -8,5 +8,6 @@ export class SandboxVMCommand implements ICommand {
 		public readonly parameters: Record<string, any>,
 		public readonly userId?: string,
 		public readonly language?: 'javascript' | 'python',
+		public readonly timeout?: number,
 	) {}
 }
