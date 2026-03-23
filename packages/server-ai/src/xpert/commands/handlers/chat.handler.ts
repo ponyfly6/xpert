@@ -383,7 +383,8 @@ export class XpertChatHandler implements ICommandHandler<XpertChatCommand> {
                                         incoming: event.data.data,
                                         fallbackSource:
                                             typeof event.data.data === 'string' ? 'memory_reply' : undefined,
-                                        fallbackStreamId: aiMessage?.id ?? executionId
+                                        fallbackStreamId: aiMessage?.id ?? executionId,
+                                        fallbackAgentKey: xpert.agent.key
                                     })
 
                                     appendMessageContent(aiMessage, event.data.data, messageContext)
