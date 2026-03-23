@@ -12,6 +12,7 @@ export type TMessageJoinHint = 'none' | 'space' | 'line' | 'paragraph'
 export type TMessageAppendContext = {
   source?: string
   streamId?: string
+  agentKey?: string
   joinHint?: TMessageJoinHint
 }
 
@@ -24,6 +25,7 @@ export type TResolveMessageAppendContextOptions = {
   incoming: string | TMessageContentComplex
   fallbackSource?: string
   fallbackStreamId?: string
+  fallbackAgentKey?: string
 }
 
 export type TResolvedMessageAppendContext = {
@@ -96,7 +98,12 @@ function shouldJoinWithoutSeparator(
   previous: TMessageAppendContext | null | undefined,
   current: TMessageAppendContext
 ): boolean {
-  return !!previous?.streamId && previous.source === current.source && previous.streamId === current.streamId
+  return (
+    !!previous?.streamId &&
+    previous.source === current.source &&
+    previous.streamId === current.streamId &&
+    previous.agentKey === current.agentKey
+  )
 }
 
 function getSeparator(
@@ -136,11 +143,16 @@ function normalizeIncomingContent(
     return content
   }
 
-  return {
+  const textContent: TMessageContentText = {
     type: 'text',
-    text: content,
-    ...(context.streamId ? { id: context.streamId } : {})
-  } as TMessageContentText
+    text: content
+  }
+
+  if (context.streamId) {
+    textContent.id = context.streamId
+  }
+
+  return textContent
 }
 
 function ensureArrayContent(content: CopilotChatMessage['content']): TMessageContentComplex[] {
@@ -206,20 +218,45 @@ export function inferMessageAppendContext(
   content: string | TMessageContentComplex,
   fallbackSource?: string
 ): TMessageAppendContext {
-  return {
-    source: fallbackSource ?? inferContentSource(content),
-    ...(typeof content !== 'string' && content?.id ? { streamId: String(content.id) } : {})
+  const context: TMessageAppendContext = {
+    source: fallbackSource ?? inferContentSource(content)
   }
+
+  if (typeof content !== 'string') {
+    if (content?.id) {
+      context.streamId = String(content.id)
+    }
+    if ('agentKey' in content && content.agentKey) {
+      context.agentKey = String(content.agentKey)
+    }
+  }
+
+  return context
 }
 
 export function resolveMessageAppendContext(
   options: TResolveMessageAppendContextOptions
 ): TResolvedMessageAppendContext {
   const inferredContext = inferMessageAppendContext(options.incoming, options.fallbackSource)
-  const appendContext =
-    typeof options.incoming === 'string' && !inferredContext.streamId && options.fallbackStreamId
-      ? { ...inferredContext, streamId: options.fallbackStreamId }
-      : inferredContext
+
+  // Apply fallback values for string content that doesn't have embedded metadata
+  const appendContext = (() => {
+    if (typeof options.incoming === 'string') {
+      const fallbacks: Partial<TMessageAppendContext> = {}
+
+      if (!inferredContext.streamId && options.fallbackStreamId) {
+        fallbacks.streamId = options.fallbackStreamId
+      }
+
+      if (!inferredContext.agentKey && options.fallbackAgentKey) {
+        fallbacks.agentKey = options.fallbackAgentKey
+      }
+
+      return { ...inferredContext, ...fallbacks }
+    }
+
+    return inferredContext
+  })()
 
   const messageContext = shouldJoinWithoutSeparator(options.previous, appendContext)
     ? { ...appendContext, joinHint: 'none' as const }
