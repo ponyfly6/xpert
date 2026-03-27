@@ -181,6 +181,38 @@
 
 <div class="w-full h-[0.5px] bg-divider-subtle"></div>
 
+<div class="pt-2">
+  <div class="flex items-center justify-between px-4 py-2 h-10">
+    <div class="flex items-center">
+      <div class="mr-0.5 system-sm-semibold-uppercase text-text-secondary">
+        {{ 'PAC.Xpert.Timeout' | translate: {Default: 'Timeout'} }}
+      </div>
+      <i class="ri-information-line opacity-20 hover:opacity-100 ml-1"
+        [matTooltip]="'PAC.Xpert.TimeoutTip' | translate: {Default: 'Execution timeout in milliseconds. Default is 5000ms (5 seconds). If the script execution exceeds this time, it will be terminated.'}"
+        matTooltipPosition="above"
+      ></i>
+    </div>
+  </div>
+
+  <div class="w-full flex justify-between items-center px-4">
+    <div class="grow text-sm">
+      {{'PAC.Xpert.TimeoutMs' | translate: {Default: 'Timeout (ms)'} }}
+    </div>
+
+    <input class="shrink-0 block ml-4 pl-3 w-24 h-8 appearance-none outline-none rounded-lg bg-gray-100 text-[13px] text-gra-900" 
+      [min]="100"
+      [max]="60000"
+      [step]="100"
+      type="number"
+      [ngModel]="timeout()"
+      (ngModelChange)="updateTimeout($event)"
+      [placeholder]="'5000'"
+    >
+  </div>
+</div>
+
+<div class="w-full h-[0.5px] bg-divider-subtle"></div>
+
 <xpert-workflow-error-handling class="p-4" [defaultValueSchema]="outputs()"
   [ngModel]="errorHandling()"
   (ngModelChange)="updateEntity('errorHandling', $event)"
