@@ -67,7 +67,7 @@ export class KnowledgeDocumentPreviewComponent {
     options: {
       equal: isEqual
     },
-    loader: ({ request }) => (request.fileUrl ? this.knowledgeDocumentService.estimate(request) : of(null))
+    loader: ({ request }) => (request.fileUrl || request.filePath ? this.knowledgeDocumentService.estimate(request) : of(null))
   })
 
   readonly loading = computed(() => this.estimateFile.status() === 'loading')
