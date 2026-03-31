@@ -284,11 +284,12 @@ export class KnowledgeFileUploader {
                 name: this.file.name,
                 size: `${this.file.size}`,
                 type,
+                fileUrl: event.body.fileUrl ?? event.body.url,
                 category: classificateDocumentCategory({ type }),
                 metadata
               })
               this.document.set(this.document$.value)
-              this.uploadedUrl.set(event.body.fileUrl) // Assuming response contains URL
+              this.uploadedUrl.set(event.body.fileUrl ?? event.body.url) // Assuming response contains URL
               this.status.set('done')
               break
             }

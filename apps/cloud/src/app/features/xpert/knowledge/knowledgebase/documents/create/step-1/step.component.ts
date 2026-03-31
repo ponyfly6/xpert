@@ -202,11 +202,13 @@ export class KnowledgeDocumentCreateStep1Component {
 
   // Available
   readonly nextStepAvailable = computed(() => {
-    return this.sourceType()[0] === KDocumentSourceType.LocalFile 
-      ? this.files()?.length > 0 
-      : this.sourceType()[0] === KDocumentSourceType.WebCrawl 
-        ? this.webDocs()?.length > 0 
-        : this.sourceType()[0] === KDocumentSourceType.FileSystem ? !this.fileSystemForm()?.invalid : false
+    return this.sourceType()[0] === KDocumentSourceType.LocalFile
+      ? !!this.files()?.length && this.files().every((file) => file.status() === 'done' && !!file.document())
+      : this.sourceType()[0] === KDocumentSourceType.WebCrawl
+        ? this.webDocs()?.length > 0
+        : this.sourceType()[0] === KDocumentSourceType.FileSystem
+          ? !this.fileSystemForm()?.invalid
+          : false
   })
 
   // File system
