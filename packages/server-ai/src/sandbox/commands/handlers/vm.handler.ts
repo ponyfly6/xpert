@@ -3,98 +3,87 @@ import { Inject, Logger } from '@nestjs/common'
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs'
 import { Cache } from 'cache-manager'
 import { spawn } from 'child_process'
-import { ExternalCopy, Isolate } from 'isolated-vm'
+import { join } from 'path'
 import { SandboxVMCommand } from '../vm.command'
 import { runPythonFunction } from './python'
 
 @CommandHandler(SandboxVMCommand)
 export class SandboxVMHandler implements ICommandHandler<SandboxVMCommand> {
-	readonly #logger = new Logger(SandboxVMHandler.name)
+        readonly #logger = new Logger(SandboxVMHandler.name)
 
-	constructor(
-		@Inject(CACHE_MANAGER)
-		private readonly cacheManager: Cache,
-	) {}
+        constructor(
+                @Inject(CACHE_MANAGER)
+                private readonly cacheManager: Cache,
+        ) {}
 
-	public async execute(command: SandboxVMCommand) {
-		const { code, parameters, language } = command
-		if (language === 'javascript') {
-			return await this.runJavaScriptCode(parameters, code)
-		} else if (language === 'python') {
-			return await runPythonFunction(parameters, code)
-		}
+        public async execute(command: SandboxVMCommand) {
+                const { code, parameters, language } = command
+                if (language === 'javascript') {
+                        return await this.runJavaScriptCode(parameters, code)
+                } else if (language === 'python') {
+                        return await runPythonFunction(parameters, code)
+                }
 
-		throw new Error(`Unsupported language ${language}`)
-	}
+                throw new Error(`Unsupported language ${language}`)
+        }
 
-	async runJavaScriptCode(parameters: any, code: string): Promise<any> {
-		const isolate = new Isolate({ memoryLimit: 128 }) // 128MB 内存限制
-		const contextified = await isolate.createContext()
-		const jail = contextified.global
+        async runJavaScriptCode(parameters: any, code: string): Promise<any> {
+                return new Promise((resolve, reject) => {
+                        // Spawn worker process for JavaScript execution
+                        // Set NODE_PATH to include isolated-vm module location
+                        const env = { ...process.env, NODE_PATH: process.env.NODE_PATH || '' }
 
+                        const workerPath = join(__dirname, 'js-worker.js')
+                        const jsProcess = spawn('node', [workerPath], {
+                                stdio: ['pipe', 'pipe', 'pipe'],
+                                env
+                        })
 
-		// Bind user variables to sandbox
-		for (const [key, value] of Object.entries(parameters)) {
-			await jail.set(key, new ExternalCopy(value).copyInto())
-		}
+                        let output = ''
+                        let errorOutput = ''
 
-		// Execute code (seems to only return strings)
-		const wrappedCode = `JSON.stringify((() => { \n${code}\n })())`
+                        // Send code and parameters to worker
+                        const payload = JSON.stringify({ code, parameters })
+                        jsProcess.stdin.write(payload)
+                        jsProcess.stdin.end()
 
-		const script = await isolate.compileScript(wrappedCode)
-		const result = await script.run(contextified)
+                        // Collect output from worker
+                        jsProcess.stdout.on('data', (data) => {
+                                output += data.toString()
+                        })
 
-		return {
-			result: JSON.parse(result),
-		}
-	}
+                        // Collect error messages
+                        jsProcess.stderr.on('data', (data) => {
+                                errorOutput += data.toString()
+                        })
 
-	async runPythonCode(input: any, pythonCode: string): Promise<any> {
-		return new Promise((resolve, reject) => {
-			// Convert the key value pairs of the input object into Python variable definitions
-			const inputVariables = Object.entries(input)
-				.map(([key, value]) => `${key} = ${JSON.stringify(value)}`)
-				.join('\n')
+                        // Timeout protection - kill worker if execution takes too long
+                        const timeout = setTimeout(() => {
+                                jsProcess.kill('SIGKILL')
+                                reject(new Error('JavaScript execution timeout'))
+                        }, 5000) // 5 seconds timeout (consistent with Python)
 
-			// Splice the variable definition before the Python code
-			const fullPythonCode = `${inputVariables}\n${pythonCode}`
+                        // Handle worker process completion
+                        jsProcess.on('close', (code) => {
+                                clearTimeout(timeout)
+                                if (code === 0) {
+                                        try {
+                                                const result = JSON.parse(output)
+                                                resolve(result)
+                                        } catch (e) {
+                                                // If not valid JSON, return as-is
+                                                resolve({ result: output })
+                                        }
+                                } else {
+                                        reject(new Error(errorOutput || 'JavaScript execution failed'))
+                                }
+                        })
 
-			// Use the -c parameter to directly execute a Python code string
-			const pythonProcess = spawn('python3', ['-c', fullPythonCode], {
-				stdio: ['pipe', 'pipe', 'pipe'] // Configure stdin, stdout, stderr
-			})
-
-			let output = ''
-			let errorOutput = ''
-
-			// Collect the output of the Python script
-			pythonProcess.stdout.on('data', (data) => {
-				output += data.toString()
-			})
-
-			// Collect error messages
-			pythonProcess.stderr.on('data', (data) => {
-				errorOutput += data.toString()
-			})
-
-			const timeout = setTimeout(() => {
-				pythonProcess.kill()
-				reject(new Error('Python execution timeout'))
-			}, 5000) // 5 seconds timeout
-
-			// Script execution completed
-			pythonProcess.on('close', (code) => {
-				clearTimeout(timeout)
-				if (code === 0) {
-					try {
-						resolve(JSON.parse(output)) // Assume the return is in JSON format
-					} catch (e) {
-						resolve(output) // If not JSON, return original output
-					}
-				} else {
-					reject(new Error(errorOutput))
-				}
-			})
-		})
-	}
+                        // Handle worker process errors
+                        jsProcess.on('error', (error) => {
+                                clearTimeout(timeout)
+                                reject(new Error(`Failed to spawn JavaScript worker: ${error.message}`))
+                        })
+                })
+        }
 }
