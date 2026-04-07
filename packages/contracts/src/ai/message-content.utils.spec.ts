@@ -52,13 +52,12 @@ describe('message-content.utils', () => {
     appendMessageContent(message, 'A2', { source: 'chat_stream', streamId: 'stream-a' })
 
     const chunks = message.content as any[]
-    expect(chunks).toHaveLength(3)
+    // A1 and A2 should be merged (same streamId and source, same agentKey=undefined)
+    expect(chunks).toHaveLength(2)
     expect(chunks[0].id).toBe('stream-a')
-    expect(chunks[0].text).toBe('A1')
+    expect(chunks[0].text).toBe('A1A2')
     expect(chunks[1].id).toBe('stream-b')
     expect(chunks[1].text).toBe('\nB1')
-    expect(chunks[2].id).toBe('stream-a')
-    expect(chunks[2].text).toBe('\nA2')
   })
 
   it('adds a line break when next text follows a closed code fence from another stream', () => {
@@ -188,5 +187,87 @@ describe('message-content.utils', () => {
     expect(message.status).toBe('reasoning')
     expect(message.reasoning).toHaveLength(1)
     expect(message.reasoning[0].text).toBe('AB')
+  })
+
+  it('merges interleaved chunks from different agents by agentKey', () => {
+    const message = { id: 'm1', role: 'ai', content: [] } as CopilotChatMessage
+
+    // Simulate concurrent streaming from two agents with same streamId but different agentKeys
+    appendMessageContent(
+      message,
+      { type: 'text', id: 'stream-1', agentKey: 'agent-a', text: 'Hello' } as any,
+      { source: 'chat_stream', streamId: 'stream-1', agentKey: 'agent-a' }
+    )
+    appendMessageContent(
+      message,
+      { type: 'text', id: 'stream-1', agentKey: 'agent-b', text: 'Hi' } as any,
+      { source: 'chat_stream', streamId: 'stream-1', agentKey: 'agent-b' }
+    )
+    appendMessageContent(
+      message,
+      { type: 'text', id: 'stream-1', agentKey: 'agent-a', text: ' World' } as any,
+      { source: 'chat_stream', streamId: 'stream-1', agentKey: 'agent-a' }
+    )
+
+    const chunks = message.content as any[]
+    // Agent A and Agent B chunks should be separate
+    expect(chunks).toHaveLength(2)
+    // Agent A's content should be merged into one chunk
+    expect(chunks[0].agentKey).toBe('agent-a')
+    expect(chunks[0].text).toBe('Hello World')
+    // Agent B's content should be separate
+    expect(chunks[1].agentKey).toBe('agent-b')
+    expect(chunks[1].text).toBe('\nHi')
+  })
+
+  it('merges string chunks when agentKey matches in context', () => {
+    const message = { id: 'm1', role: 'ai', content: [] } as CopilotChatMessage
+
+    // Simulate string chunks with agentKey in context (as happens in real scenario)
+    appendMessageContent(message, 'A1', {
+      source: 'chat_stream',
+      streamId: 'stream-1',
+      agentKey: 'agent-a'
+    })
+    appendMessageContent(message, 'B1', {
+      source: 'chat_stream',
+      streamId: 'stream-1',
+      agentKey: 'agent-b'
+    })
+    appendMessageContent(message, 'A2', {
+      source: 'chat_stream',
+      streamId: 'stream-1',
+      agentKey: 'agent-a'
+    })
+
+    const chunks = message.content as any[]
+    // Should have 2 chunks: one for agent-a (merged) and one for agent-b
+    expect(chunks).toHaveLength(2)
+    expect(chunks[0].id).toBe('stream-1')
+    expect(chunks[0].text).toBe('A1A2')
+    expect(chunks[1].id).toBe('stream-1')
+    expect(chunks[1].text).toBe('\nB1')
+  })
+
+  it('resolves append context with fallback agentKey', () => {
+    const previous = {
+      source: 'chat_stream',
+      streamId: 'stream-a',
+      agentKey: 'agent-x'
+    } as TMessageAppendContext
+
+    const { appendContext, messageContext } = resolveMessageAppendContext({
+      previous,
+      incoming: 'next chunk',
+      fallbackSource: 'chat_stream',
+      fallbackStreamId: 'stream-a',
+      fallbackAgentKey: 'agent-x'
+    })
+
+    expect(appendContext.source).toBe('chat_stream')
+    expect(appendContext.streamId).toBe('stream-a')
+    expect(appendContext.agentKey).toBe('agent-x')
+    // Since previous matches, should have joinHint: 'none'
+    expect(messageContext.joinHint).toBe('none')
   })
 })

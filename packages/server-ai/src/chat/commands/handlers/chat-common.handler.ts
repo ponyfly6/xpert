@@ -511,8 +511,8 @@ export class ChatCommonHandler implements ICommandHandler<ChatCommonCommand> {
                         const transformGraphEvent = createMapStreamEvents(this.#logger, subscriber, {
                             xperts: project?.xperts,
                             // mute: [
-                            // 	...mute,
-                            // 	[GRAPH_NODE_TITLE_CONVERSATION]
+                            //  ...mute,
+                            //  [GRAPH_NODE_TITLE_CONVERSATION]
                             // ],
                             unmutes: []
                         })
@@ -615,7 +615,8 @@ export class ChatCommonHandler implements ICommandHandler<ChatCommonCommand> {
                         const { messageContext } = messageAppendContextTracker.resolve({
                             incoming: event.data.data,
                             fallbackSource: typeof event.data.data === 'string' ? 'chat_reply' : undefined,
-                            fallbackStreamId: aiMessage?.id ?? executionId
+                            fallbackStreamId: aiMessage?.id ?? executionId,
+                            fallbackAgentKey: xpert?.agent?.key ?? ''
                         })
 
                         appendMessageContent(aiMessage as CopilotChatMessage, event.data.data, messageContext)
@@ -623,8 +624,8 @@ export class ChatCommonHandler implements ICommandHandler<ChatCommonCommand> {
                     } else if (event.data.type === ChatMessageTypeEnum.EVENT) {
                         switch (event.data.event) {
                             // case (ChatMessageEventTypeEnum.ON_AGENT_END): {
-                            // 	_execution = event.data.data
-                            // 	break
+                            //  _execution = event.data.data
+                            //  break
                             // }
                             case ChatMessageEventTypeEnum.ON_INTERRUPT: {
                                 operation = event.data.data
@@ -902,7 +903,7 @@ export class ChatCommonHandler implements ICommandHandler<ChatCommonCommand> {
 
             // const files = await fileToolset?.listFiles('project', projectId)
             // if (files) {
-            // 	systemTemplate += '\n\n' + `The list of files in the current workspace is:\n${files.map(({filePath}) => filePath).join('\n') || 'No files yet.'}\n`
+            //  systemTemplate += '\n\n' + `The list of files in the current workspace is:\n${files.map(({filePath}) => filePath).join('\n') || 'No files yet.'}\n`
             // }
             const systemMessage = await SystemMessagePromptTemplate.fromTemplate(systemTemplate, {
                 templateFormat: 'mustache'
