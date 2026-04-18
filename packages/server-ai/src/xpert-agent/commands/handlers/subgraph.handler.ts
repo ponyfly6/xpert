@@ -94,7 +94,7 @@ import {
     TAgentSubgraphParams,
     TAgentSubgraphResult
 } from '../../agent'
-import { initializeMemoryTools, formatMemories } from '../../../copilot-store'
+import { initializeMemoryTools } from '../../../copilot-store'
 import { CreateWorkflowNodeCommand, createWorkflowTaskTools } from '../../workflow'
 import { toEnvState } from '../../../environment'
 import {
@@ -117,7 +117,9 @@ import {
     filterDisabledTools,
     getAgentMiddlewares,
     orderNodesByKeyOrder,
-    createAgentChannel
+    createAgentChannel,
+    AgentPromptAssembler,
+    DEFAULT_PROMPT_TEMPLATES
 } from '../../../shared'
 import { CreateSummarizeTitleAgentCommand } from '../summarize-title.command'
 import { XpertCollaborator } from '../../../shared/agent/xpert'
@@ -885,26 +887,29 @@ export class XpertAgentSubgraphHandler implements ICommandHandler<XpertAgentSubg
             jsonSchema: string
         ) => {
             const { memories } = state
-            const summary = getChannelState(state, agentChannel)?.summary
+            const channelState = getChannelState(state, agentChannel)
+            const summary = channelState?.summary
             const parameters = stateToParameters(state, environment)
-            let systemTemplate = `Current date: ${state.sys.date}\nYour ID is '${agent.key}'. Your name is '${agent.name || xpert.name}'.\n${parseXmlString(agent.prompt) ?? ''}`
-            if (memories?.length) {
-                systemTemplate += `\n\n<memories>\n${formatMemories(memories)}\n</memories>`
-            }
-            if (summary) {
-                systemTemplate += `\nSummary of conversation earlier: \n${summary}`
-            }
-            const systemMessage = await SystemMessagePromptTemplate.fromTemplate(systemTemplate, {
+
+            // Use PromptAssembler for layered system prompt construction
+            const { content: systemContent } = AgentPromptAssembler.assemble({
+                agent,
+                date: state.sys.date,
+                agentKey: agent.key,
+                parameters,
+                memories,
+                summary,
+                jsonSchema
+            })
+
+            const systemMessage = await SystemMessagePromptTemplate.fromTemplate(systemContent, {
                 templateFormat: 'mustache'
             }).format(parameters)
-            if (jsonSchema) {
-                systemMessage.content += `\n\n\`\`\`json\n${jsonSchema}\n\`\`\``
-            }
 
             this.#logger.verbose(`SystemMessage of ${agentLabel(agent)}:`, systemMessage.content)
 
             const humanMessages: HumanMessage[] = []
-            const messageHistory = getChannelState(state, agentChannel)?.messages ?? []
+            const messageHistory = channelState?.messages ?? []
 
             // Determine whether it is Agent reflection (last message is not HumanMessage)
             const lastMessage = messageHistory[messageHistory.length - 1]
@@ -1300,7 +1305,7 @@ export class XpertAgentSubgraphHandler implements ICommandHandler<XpertAgentSubg
                 if (endNodes?.includes(name)) {
                     if (nextNodeKey?.length) {
                         // if (nextNodeKey.some((_) => !_)) {
-                        // 	throw new InternalServerErrorException(`There is an empty nextNodeKey in tools`)
+                        //      throw new InternalServerErrorException(`There is an empty nextNodeKey in tools`)
                         // }
                         subgraphBuilder.addConditionalEdges(name, (state, config) => {
                             return nextNodeKey.filter((_) => !!_).map((n) => new Send(n, state))
